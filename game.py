@@ -5,7 +5,7 @@ from ursina.prefabs.first_person_controller import FirstPersonController
 from game_world import World
 
 RENDER_DISTANCE = 2
-MAX_WORKERS = 4
+MAX_WORKERS = 6
 SEED = 12345
 CHUNK_SIZE = 16
 WORLD_LOWER_LIMIT = -32
@@ -45,7 +45,7 @@ class VoxelGame:
         spawn_y = WORLD_UPPER_LIMIT
         for y in range(WORLD_UPPER_LIMIT, WORLD_LOWER_LIMIT - 1, -1):
             if self.world.get_block(spawn_x, y, spawn_z) != 0:
-                spawn_y = y + 4
+                spawn_y = y + 2
                 break
         self.player_spawnpoint = Vec3(spawn_x, spawn_y, spawn_z)
 
