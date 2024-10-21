@@ -22,6 +22,7 @@ class Chunk:
     def generate_terrain(self):
         if self.blocks is not None:
             return
+        
         with self.lock:
             self.blocks = np.zeros((self.size, self.size, self.size), dtype=np.uint8)
             noise = PerlinNoise(octaves=4, seed=self.seed)

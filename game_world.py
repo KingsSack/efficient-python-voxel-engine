@@ -22,27 +22,43 @@ class World:
                 if chunk_key not in self.chunks:
                     chunk = Chunk(self.seed, (x, y, z), self, self.chunk_size, self.lower_limit, self.upper_limit)
                     self.chunks[chunk_key] = chunk
-                self.loaded_chunks.add(chunk_key)
         return self.chunks.get(chunk_key)
 
-    def generate_terrain_async(self, chunk):
+    def generate_chunk_async(self, chunk):
         terrain_future = self.executor.submit(chunk.generate_terrain)
         terrain_future.result()  # Wait for terrain generation to complete
         yield terrain_future
-
-    def generate_mesh_async(self, chunk):
+        
         mesh_future = self.executor.submit(chunk.generate_mesh)
         mesh_future.result()  # Wait for mesh generation to complete
         yield mesh_future
+    
+    def load_chunks(self, current_chunk_position, render_distance):
+        current_chunks = set()
+        min_x, min_y, min_z = (current_chunk_position[i] - render_distance for i in range(3))
+        max_x, max_y, max_z = (current_chunk_position[i] + render_distance for i in range(3))
 
-    def unload_distant_chunks(self, current_chunks):
+        for chunk_x in range(min_x, max_x + 1):
+            for chunk_y in range(min_y, max_y + 1):
+                for chunk_z in range(min_z, max_z + 1):
+                    chunk_key = (chunk_x, chunk_y, chunk_z)
+                    current_chunks.add(chunk_key)
+                    if chunk_key not in self.loaded_chunks:
+                        self.loaded_chunks.add(chunk_key)
+
+        self.unload_chunks(current_chunks)
+        return current_chunks
+
+    def unload_chunks(self, current_chunks):
         chunks_to_unload = self.loaded_chunks - current_chunks
-        with self.chunk_lock:
-            for chunk_pos in chunks_to_unload:
-                chunk = self.chunks.pop(chunk_pos, None)
-                if chunk and chunk.entity:
-                    chunk.entity.disable()
-            self.loaded_chunks = current_chunks
+        for chunk_pos in chunks_to_unload:
+            self.loaded_chunks.discard(chunk_pos)
+            self.disable_chunk(chunk_pos)
+    
+    def disable_chunk(self, chunk_pos):
+        chunk = self.get_chunk(*chunk_pos)
+        if chunk and chunk.entity:
+            chunk.entity.disable()
 
     def get_block(self, x, y, z):
         chunk_x = x // self.chunk_size

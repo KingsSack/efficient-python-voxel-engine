@@ -10,7 +10,6 @@ SEED = 12345
 CHUNK_SIZE = 16
 WORLD_LOWER_LIMIT = -32
 WORLD_UPPER_LIMIT = 32
-CHUNKS_PER_FRAME = 1
 
 
 class VoxelGame:
@@ -49,11 +48,10 @@ class VoxelGame:
                 spawn_y = y + 4
                 break
         self.player_spawnpoint = Vec3(spawn_x, spawn_y, spawn_z)
-        print(f"Spawnpoint set to: ({self.player_spawnpoint})")
 
     def respawn_player(self):
         self.player.position = self.player_spawnpoint
-        print(f"Player respawned at: {self.player.position}")
+        print(f"Player position set to: {self.player.position}")
 
     def spawn_player(self):
         self.calculate_spawn_position()
@@ -123,17 +121,14 @@ class VoxelGame:
                 for dy in range(WORLD_UPPER_LIMIT // CHUNK_SIZE, WORLD_LOWER_LIMIT // CHUNK_SIZE - 1, -1):
                     required_chunks.append((spawn_chunk_x + dx, dy, spawn_chunk_z + dz))
 
-        for chunk_pos in required_chunks:
-            chunk = self.world.get_chunk(*chunk_pos)
-            if chunk:
-                yield from self.world.generate_terrain_async(chunk)
-                yield from self.world.generate_mesh_async(chunk)
+        self.chunks_to_generate = required_chunks
+        yield from self.chunk_generator()
 
     def chunk_generator(self):
-        for chunk in self.chunks_to_generate:
+        while self.chunks_to_generate:
+            chunk = self.world.get_chunk(*self.chunks_to_generate.pop())
             if chunk:
-                yield from self.world.generate_terrain_async(chunk)
-                yield from self.world.generate_mesh_async(chunk)
+                yield from self.world.generate_chunk_async(chunk)
 
     def check_chunk_boundary(self):
         player_pos = self.player.position
@@ -142,24 +137,10 @@ class VoxelGame:
             floor(player_pos.y / CHUNK_SIZE),
             floor(player_pos.z / CHUNK_SIZE)
         )
-
         if current_chunk_position == self.last_chunk_position:
             return
-
         self.last_chunk_position = current_chunk_position
-
-        current_chunks = set()
-        for dx in range(-self.render_distance, self.render_distance + 1):
-            for dz in range(-self.render_distance, self.render_distance + 1):
-                for dy in range(WORLD_LOWER_LIMIT // CHUNK_SIZE, WORLD_UPPER_LIMIT // CHUNK_SIZE + 1):
-                    chunk_x = current_chunk_position[0] + dx
-                    chunk_z = current_chunk_position[2] + dz
-                    chunk_pos = (chunk_x, dy, chunk_z)
-                    current_chunks.add(chunk_pos)
-                    chunk = self.world.get_chunk(*chunk_pos)
-                    self.chunks_to_generate.append(chunk)
-
-        self.world.unload_distant_chunks(current_chunks)
+        self.chunks_to_generate = self.world.load_chunks(current_chunk_position, self.render_distance)
 
     def run(self):
         self.app.run()
