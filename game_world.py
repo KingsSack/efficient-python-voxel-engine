@@ -17,18 +17,18 @@ class World:
 
     def get_chunk(self, x, y, z):
         chunk_key = (x, y, z)
-        if chunk_key not in self.loaded_chunks:
-            with self.chunk_lock:
-                if chunk_key not in self.chunks:
-                    chunk = Chunk(self.seed, (x, y, z), self, self.chunk_size, self.lower_limit, self.upper_limit)
-                    self.chunks[chunk_key] = chunk
+        with self.chunk_lock:
+            if chunk_key not in self.chunks:
+                chunk = Chunk(self.seed, (x, y, z), self, self.chunk_size, self.lower_limit, self.upper_limit)
+                self.chunks[chunk_key] = chunk
         return self.chunks.get(chunk_key)
 
-    def generate_chunk_async(self, chunk):
+    def generate_chunk_terrain_async(self, chunk):
         terrain_future = self.executor.submit(chunk.generate_terrain)
         terrain_future.result()  # Wait for terrain generation to complete
         yield terrain_future
-        
+    
+    def generate_chunk_mesh_async(self, chunk):
         mesh_future = self.executor.submit(chunk.generate_mesh)
         mesh_future.result()  # Wait for mesh generation to complete
         yield mesh_future
@@ -44,6 +44,9 @@ class World:
                     chunk_key = (chunk_x, chunk_y, chunk_z)
                     current_chunks.add(chunk_key)
                     if chunk_key not in self.loaded_chunks:
+                        if chunk_key in self.chunks:
+                            chunk = self.chunks[chunk_key]
+                            chunk.needs_update = True
                         self.loaded_chunks.add(chunk_key)
 
         self.unload_chunks(current_chunks)

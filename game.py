@@ -85,6 +85,7 @@ class VoxelGame:
                 next(self.stepped_generation)
             except StopIteration:
                 print("Initial world generation complete.")
+                self.last_chunk_position = (0, 0, 0)
                 self.stepped_generation = self.chunk_generator()
                 self.loading_screen.enabled = False
                 self.initial_generation_complete = True
@@ -94,10 +95,11 @@ class VoxelGame:
         if not self.player.enabled:
             return
 
-        try:
-            next(self.stepped_generation)
-        except StopIteration:
-            self.stepped_generation = self.chunk_generator()
+        if self.chunks_to_generate:
+            try:
+                next(self.stepped_generation)
+            except StopIteration:
+                self.stepped_generation = self.chunk_generator()
 
         self.check_chunk_boundary()
 
@@ -126,9 +128,15 @@ class VoxelGame:
 
     def chunk_generator(self):
         while self.chunks_to_generate:
-            chunk = self.world.get_chunk(*self.chunks_to_generate.pop())
+            chunk_pos = self.chunks_to_generate.pop()
+            chunk = self.world.get_chunk(*chunk_pos)
             if chunk:
-                yield from self.world.generate_chunk_async(chunk)
+                if chunk.blocks is None:
+                    yield from self.world.generate_chunk_terrain_async(chunk)
+                if chunk.needs_update and chunk.blocks is not None:
+                    yield from self.world.generate_chunk_mesh_async(chunk)
+            else:
+                print(f"Chunk not found: {chunk_pos}")
 
     def check_chunk_boundary(self):
         player_pos = self.player.position
