@@ -136,9 +136,9 @@ class Chunk:
 
     def get_block(self, x, y, z):
         if self.blocks is None:
-            return 0
+            return Block("air")
 
         if 0 <= x < self.size and 0 <= y < self.size and 0 <= z < self.size:
             return self.blocks[x, y, z]
         else:
-            return 0
+            return Block("air")
