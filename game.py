@@ -4,6 +4,7 @@ from math import floor
 from ursina import camera, Sky, Text, Ursina, Vec3, held_keys, raycast, window, mouse
 from ursina.prefabs.first_person_controller import FirstPersonController
 
+from game_block import Block, Dirt
 from game_world import World
 
 RENDER_DISTANCE = 2
@@ -74,11 +75,11 @@ class VoxelGame:
 
     def on_left_mouse_down(self):
         if self.player.enabled:
-            self.modify_block(1)
+            self.modify_block(Block(texture='air'))
 
     def on_right_mouse_down(self):
         if self.player.enabled:
-            self.modify_block(0)
+            self.modify_block(Dirt())
 
     def modify_block(self, block_type):
         hit_info = raycast(self.player.position, self.player.forward, distance=5)
