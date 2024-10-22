@@ -1,5 +1,6 @@
 from math import floor
-from ursina import Text, Ursina, Vec3, held_keys, raycast, window
+
+from ursina import Sky, Text, Ursina, Vec3, held_keys, raycast, window
 from ursina.prefabs.first_person_controller import FirstPersonController
 
 from game_world import World
@@ -20,7 +21,9 @@ class VoxelGame:
         window.fps_counter.enabled = True
 
         self.render_distance = render_distance
-
+        
+        self.sky = Sky()
+        
         self.world = World(max_workers, seed, chunk_size, lower_limit, upper_limit)
 
         self.player = FirstPersonController(enabled=False)

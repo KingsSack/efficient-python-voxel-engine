@@ -4,6 +4,8 @@ import numpy as np
 from perlin_noise import PerlinNoise
 from ursina import Entity, Mesh, Vec3, scene
 
+from game_block import Block, Dirt, Grass, Stone
+
 
 class Chunk:
     def __init__(self, seed, position, world, size, lower_limit, upper_limit):
@@ -22,9 +24,9 @@ class Chunk:
     def generate_terrain(self):
         if self.blocks is not None:
             return
-        
+
         with self.lock:
-            self.blocks = np.zeros((self.size, self.size, self.size), dtype=np.uint8)
+            self.blocks = np.empty((self.size, self.size, self.size), dtype=object)
             noise = PerlinNoise(octaves=4, seed=self.seed)
             for x in range(self.size):
                 for z in range(self.size):
@@ -34,9 +36,14 @@ class Chunk:
                     for y in range(self.size):
                         world_y = self.position[1] * self.size + y
                         if self.lower_limit <= world_y < min(height, self.upper_limit):
-                            self.blocks[x, y, z] = 1
+                            if world_y < 0:
+                                self.blocks[x, y, z] = Stone()
+                            elif world_y == height - 1:
+                                self.blocks[x, y, z] = Grass()
+                            else:
+                                self.blocks[x, y, z] = Dirt()
                         else:
-                            self.blocks[x, y, z] = 0
+                            self.blocks[x, y, z] = Block("air")
             self.needs_update = True
 
     def generate_mesh(self):
@@ -51,28 +58,34 @@ class Chunk:
             for x in range(self.size):
                 for y in range(self.size):
                     for z in range(self.size):
-                        if self.blocks[x, y, z]:
+                        block = self.blocks[x, y, z]
+                        if block.texture != "air":
                             for face in range(6):
                                 if self.is_face_visible(x, y, z, face):
                                     verts = self.get_face_vertices(x, y, z, face)
                                     vertices.extend(verts)
                                     tri = self.get_face_triangles(vertex_count)
                                     triangles.extend(tri)
-                                    uvs.extend([(0, 0), (1, 0), (1, 1), (0, 1)])
+                                    face_name = ['side', 'side', 'side', 'side', 'bottom', 'top'][face]
+                                    face_uv = block.get_face(face_name).uv
+                                    uvs.extend([(face_uv[0], face_uv[1]), (face_uv[2], face_uv[1]),
+                                                (face_uv[2], face_uv[3]), (face_uv[0], face_uv[3])])
                                     vertex_count += 4
+
             if not vertices:
                 if self.entity:
                     self.entity.disable()
                 self.mesh = None
                 self.needs_update = False
                 return
+
             self.mesh = Mesh(vertices=vertices, triangles=triangles, uvs=uvs, static=False)
             if not self.entity:
                 self.entity = Entity(
                     parent=scene,
                     model=self.mesh,
                     position=Vec3(*self.position) * self.size,
-                    texture='test',
+                    texture='atlas.png',  # Use your texture atlas image
                     collider='mesh'
                 )
             else:
@@ -94,7 +107,7 @@ class Chunk:
         nx, ny, nz = x + dx, y + dy, z + dz
 
         if 0 <= nx < self.size and 0 <= ny < self.size and 0 <= nz < self.size:
-            return not self.blocks[nx, ny, nz]  # If neighbor block is empty, face is visible
+            return self.blocks[nx, ny, nz].texture == "air"  # If neighbor block is air, face is visible
         else:
             return True
 
@@ -109,8 +122,8 @@ class Chunk:
         ]
         face_indices = [
             [0, 1, 2, 3],  # front
-            [7, 6, 5, 4],  # back
-            [3, 7, 4, 0],  # left
+            [5, 4, 7, 6],  # back
+            [4, 0, 3, 7],  # left
             [1, 5, 6, 2],  # right
             [4, 5, 1, 0],  # bottom
             [3, 2, 6, 7]   # top

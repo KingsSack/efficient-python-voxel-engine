@@ -1,6 +1,7 @@
-from game_chunk import Chunk
-from concurrent.futures import ThreadPoolExecutor
 import threading
+from concurrent.futures import ThreadPoolExecutor
+
+from game_chunk import Chunk
 
 
 class World:
