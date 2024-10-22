@@ -2,30 +2,32 @@ from math import floor
 
 from ursina import Sky, Text, Ursina, Vec3, held_keys, raycast, window
 from ursina.prefabs.first_person_controller import FirstPersonController
-
+import game_block
 from game_world import World
 
-RENDER_DISTANCE = 2
+render_distance = 2
 MAX_WORKERS = 6
-SEED = 12345
+seed = 12345
 CHUNK_SIZE = 16
 WORLD_LOWER_LIMIT = -32
 WORLD_UPPER_LIMIT = 32
+app = Ursina()
+sky = Sky()
 
+world = World(MAX_WORKERS, seed, CHUNK_SIZE, WORLD_LOWER_LIMIT, WORLD_UPPER_LIMIT)
 
 class VoxelGame:
-    def __init__(self, render_distance, max_workers, seed, chunk_size, lower_limit, upper_limit):
-        self.app = Ursina()
+    def __init__(self):
+        global CHUNK_SIZE
+        global seed
         window.fullscreen = False
         window.borderless = False
         window.fps_counter.enabled = True
-
-        self.render_distance = render_distance
-        
-        self.sky = Sky()
-        
-        self.world = World(max_workers, seed, chunk_size, lower_limit, upper_limit)
-
+        global world
+        global WORLD_LOWER_LIMIT
+        global WORLD_UPPER_LIMIT
+        global render_distance
+        global MAX_WORKERS
         self.player = FirstPersonController(enabled=False)
         self.player_spawnpoint = Vec3(0, 0, 0)
 
@@ -38,7 +40,7 @@ class VoxelGame:
         )
 
         self.initial_generation_complete = False
-        self.stepped_generation = self.inital_generator()
+        self.stepped_generation = self.initial_generator()
 
         self.last_chunk_position = None
         self.chunks_to_generate = []
@@ -47,7 +49,7 @@ class VoxelGame:
         spawn_x, spawn_z = 0, 0
         spawn_y = WORLD_UPPER_LIMIT
         for y in range(WORLD_UPPER_LIMIT, WORLD_LOWER_LIMIT - 1, -1):
-            if self.world.get_block(spawn_x, y, spawn_z) != 0:
+            if world.get_block(spawn_x, y, spawn_z) != 0:
                 spawn_y = y + 2
                 break
         self.player_spawnpoint = Vec3(spawn_x, spawn_y, spawn_z)
@@ -69,18 +71,19 @@ class VoxelGame:
 
     def on_left_mouse_down(self):
         if self.player.enabled:
-            self.modify_block(1)
+            self.modify_block(game_block.Block("air"))
 
     def on_right_mouse_down(self):
         if self.player.enabled:
-            self.modify_block(0)
+            self.modify_block(game_block.Dirt())
 
     def modify_block(self, block_type):
         hit_info = raycast(self.player.position, self.player.forward, distance=5)
+        print("modified block")
         if hit_info.hit:
-            block_pos = hit_info.entity.position + hit_info.normal * (0.5 if block_type == 1 else -0.5)
+            block_pos = hit_info.entity.position + hit_info.normal * (0.5 if block_type.texture == "air" else -0.5)
             x, y, z = int(block_pos.x), int(block_pos.y), int(block_pos.z)
-            self.world.set_block(x, y, z, block_type)
+            world.set_block(x, y, z, block_type)
 
     def update(self):
         if not self.initial_generation_complete:
@@ -114,15 +117,15 @@ class VoxelGame:
         if held_keys['right mouse']:
             self.on_right_mouse_down()
 
-    def inital_generator(self):
+    def initial_generator(self):
         spawn_x = 0
         spawn_z = 0
         spawn_chunk_x = spawn_x // CHUNK_SIZE
         spawn_chunk_z = spawn_z // CHUNK_SIZE
 
         required_chunks = []
-        for dx in range(-self.render_distance, self.render_distance + 1):
-            for dz in range(-self.render_distance, self.render_distance + 1):
+        for dx in range(-render_distance, render_distance + 1):
+            for dz in range(-render_distance, render_distance + 1):
                 for dy in range(WORLD_UPPER_LIMIT // CHUNK_SIZE, WORLD_LOWER_LIMIT // CHUNK_SIZE - 1, -1):
                     required_chunks.append((spawn_chunk_x + dx, dy, spawn_chunk_z + dz))
 
@@ -132,12 +135,12 @@ class VoxelGame:
     def chunk_generator(self):
         while self.chunks_to_generate:
             chunk_pos = self.chunks_to_generate.pop()
-            chunk = self.world.get_chunk(*chunk_pos)
+            chunk = world.get_chunk(*chunk_pos)
             if chunk:
                 if chunk.blocks is None:
-                    yield from self.world.generate_chunk_terrain_async(chunk)
+                    yield from world.generate_chunk_terrain_async(chunk)
                 if chunk.needs_update and chunk.blocks is not None:
-                    yield from self.world.generate_chunk_mesh_async(chunk)
+                    yield from world.generate_chunk_mesh_async(chunk)
             else:
                 print(f"Chunk not found: {chunk_pos}")
 
@@ -151,16 +154,18 @@ class VoxelGame:
         if current_chunk_position == self.last_chunk_position:
             return
         self.last_chunk_position = current_chunk_position
-        self.chunks_to_generate = self.world.load_chunks(current_chunk_position, self.render_distance)
+        self.chunks_to_generate = world.load_chunks(current_chunk_position, render_distance)
 
-    def run(self):
-        self.app.run()
+
+def run():
+    global app
+    app.run()
 
 
 if __name__ == '__main__':
-    game = VoxelGame(RENDER_DISTANCE, MAX_WORKERS, SEED, CHUNK_SIZE, WORLD_LOWER_LIMIT, WORLD_UPPER_LIMIT)
+    game = VoxelGame()
 
     def update():
         game.update()
 
-    game.run()
+    run()

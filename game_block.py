@@ -4,6 +4,7 @@ class BlockFace:
         self.color = color
         self.uv = uv  # UV coordinates
 
+
 class Block:
     def __init__(self, texture, color=(255, 255, 255), faces=None, uvs=None):
         self.texture = texture
@@ -19,10 +20,12 @@ class Block:
     def get_face(self, face):
         return self.faces.get(face)
 
+
 class Dirt(Block):
     def __init__(self):
         uvs = {"top": (0, 0, 1/4, 1), "bottom": (0, 0, 1/4, 1), "side": (0, 0, 1/4, 1)}
         super().__init__("textures/blocks/dirt", uvs=uvs)
+
 
 class Grass(Block):
     def __init__(self):
@@ -36,6 +39,7 @@ class Grass(Block):
             "bottom": BlockFace("textures/blocks/dirt", uv=uvs["bottom"]),
             "side": BlockFace("textures/blocks/glass_block_side", uv=uvs["side"])
         })
+
 
 class Stone(Block):
     def __init__(self):

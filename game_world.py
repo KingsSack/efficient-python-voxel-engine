@@ -58,7 +58,16 @@ class World:
         for chunk_pos in chunks_to_unload:
             self.loaded_chunks.discard(chunk_pos)
             self.disable_chunk(chunk_pos)
-    
+
+    def reload_chunk(self, x, y, z):
+        print("reloading")
+        chunk = self.chunks[x, y, z]
+        self.loaded_chunks.discard(chunk)
+        self.disable_chunk([x, y, z])
+        mesh_future = self.executor.submit(chunk.generate_mesh)
+        mesh_future.result()  # Wait for mesh generation to complete
+        yield mesh_future
+
     def disable_chunk(self, chunk_pos):
         chunk = self.get_chunk(*chunk_pos)
         if chunk and chunk.entity:
@@ -81,15 +90,15 @@ class World:
         chunk_y = y // self.chunk_size
         chunk_z = z // self.chunk_size
         chunk = self.get_chunk(chunk_x, chunk_y, chunk_z)
-        if chunk:
-            local_x = x % self.chunk_size
-            local_y = y % self.chunk_size
-            local_z = z % self.chunk_size
+
+        if chunk is not None:
+            chunk.needs_update = True
+            local_x = x - chunk_x
+            local_y = y - chunk_y
+            local_z = z - chunk_z
             with chunk.lock:
                 chunk.blocks[local_x, local_y, local_z] = block_type
-                chunk.needs_update = True
-
-            self._update_neighbor_chunks(chunk_x, chunk_y, chunk_z)
+        self.reload_chunk(chunk_x, chunk_y, chunk_z)
 
     def _update_neighbor_chunks(self, chunk_x, chunk_y, chunk_z):
         for dx in [-1, 0, 1]:
