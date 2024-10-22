@@ -1,13 +1,14 @@
+import random
 from math import floor
 
-from ursina import camera, Sky, Text, Ursina, Vec3, held_keys, raycast, window
+from ursina import camera, Sky, Text, Ursina, Vec3, held_keys, raycast, window, mouse
 from ursina.prefabs.first_person_controller import FirstPersonController
 
 from game_world import World
 
 RENDER_DISTANCE = 2
 MAX_WORKERS = 6
-SEED = 12345
+SEED = random.randint(0, 2**32 - 1)
 CHUNK_SIZE = 16
 WORLD_LOWER_LIMIT = -32
 WORLD_UPPER_LIMIT = 32
@@ -28,9 +29,10 @@ class VoxelGame:
         self.world = World(max_workers, seed, chunk_size, lower_limit, upper_limit)
 
         self.player = FirstPersonController(enabled=False)
+        # self.player.cursor.model =
         self.player_spawnpoint = Vec3(0, 0, 0)
 
-        camera.fov = 90
+        camera.fov = 70
 
         self.loading_screen = Text(
             text="Loading World, Please Wait...",
