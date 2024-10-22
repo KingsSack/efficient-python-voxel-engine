@@ -1,6 +1,6 @@
 from math import floor
 
-from ursina import Sky, Text, Ursina, Vec3, held_keys, raycast, window
+from ursina import camera, Sky, Text, Ursina, Vec3, held_keys, raycast, window
 from ursina.prefabs.first_person_controller import FirstPersonController
 
 from game_world import World
@@ -21,13 +21,16 @@ class VoxelGame:
         window.fps_counter.enabled = True
 
         self.render_distance = render_distance
-        
+
         self.sky = Sky()
-        
+        self.sky.texture = "textures/sky"
+
         self.world = World(max_workers, seed, chunk_size, lower_limit, upper_limit)
 
         self.player = FirstPersonController(enabled=False)
         self.player_spawnpoint = Vec3(0, 0, 0)
+
+        camera.fov = 90
 
         self.loading_screen = Text(
             text="Loading World, Please Wait...",
@@ -78,6 +81,8 @@ class VoxelGame:
     def modify_block(self, block_type):
         hit_info = raycast(self.player.position, self.player.forward, distance=5)
         if hit_info.hit:
+            if not hit_info.entity:
+                return
             block_pos = hit_info.entity.position + hit_info.normal * (0.5 if block_type == 1 else -0.5)
             x, y, z = int(block_pos.x), int(block_pos.y), int(block_pos.z)
             self.world.set_block(x, y, z, block_type)
