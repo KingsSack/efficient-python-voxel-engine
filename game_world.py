@@ -8,6 +8,7 @@ from game_chunk import Chunk
 
 @dataclass
 class World:
+    name: str
     surface: dict
     layers: dict
 
@@ -30,7 +31,7 @@ class WorldController:
         data = None
         try:
             with open(f"data/worlds/{name}.json", "r", encoding="utf-8") as file:
-                data = json.load(file)[name]
+                data = json.load(file)
         except FileNotFoundError:
             print(f"File '{name}.json' does not exist.")
             return

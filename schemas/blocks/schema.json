@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Block",
+  "description": "The data for a block.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the block. (There should be texture at textures/blocks/{name}.png)"
+    },
+    "uvs": {
+      "type": "object",
+      "properties": {
+        "top": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "The texture coordinates for the top face."
+        },
+        "bottom": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "The texture coordinates for the bottom face."
+        },
+        "side": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "The texture coordinates for the side face."
+        }
+      },
+      "required": ["top", "bottom", "side"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["name", "uvs"],
+  "additionalProperties": false
+}

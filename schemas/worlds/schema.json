@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "World",
+  "description": "The data for a world.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the world."
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "description": "The probability of the block occurring on the surface."
+      }
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "number",
+            "description": "The starting height of the layer."
+          },
+          "blocks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "The probability of the block generating."
+            }
+          }
+        },
+        "required": ["start", "blocks"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["name", "surface", "layers"],
+  "additionalProperties": false
+}

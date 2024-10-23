@@ -4,7 +4,6 @@ from math import floor
 from ursina import camera, Sky, Text, Ursina, Vec3, held_keys, raycast, window, mouse
 from ursina.prefabs.first_person_controller import FirstPersonController
 
-# from game_block import Block, Dirt
 from game_world import World, WorldController
 
 RENDER_DISTANCE = 2
