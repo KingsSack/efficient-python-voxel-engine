@@ -1,0 +1,21 @@
+{
+  "overworld": {
+    "surface": {
+      "grass": 1.0
+    },
+    "layers": {
+      "1": {
+        "start": 10,
+        "blocks": {
+          "dirt": 1.0
+        }
+      },
+      "2": {
+        "start": -30,
+        "blocks": {
+          "stone": 1.0
+        }
+      }
+    }
+  }
+}

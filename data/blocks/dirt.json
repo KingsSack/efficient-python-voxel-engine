@@ -1,0 +1,10 @@
+{
+  "dirt": {
+    "texture": "textures/blocks/dirt",
+    "uvs": {
+      "top": [0, 0, 0.25, 1],
+      "bottom": [0, 0, 0.25, 1],
+      "side": [0, 0, 0.25, 1]
+    }
+  }
+}

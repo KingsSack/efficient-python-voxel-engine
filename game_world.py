@@ -1,26 +1,55 @@
+import json
+from dataclasses import dataclass
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from game_chunk import Chunk
 
 
+@dataclass
 class World:
+    surface: dict
+    layers: dict
+
+
+class WorldController:
     def __init__(self, max_workers, seed, chunk_size, lower_limit, upper_limit):
         self.chunks = {}
         self.chunk_lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.loaded_chunks = set()
-        
+
         self.seed = seed
         self.chunk_size = chunk_size
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
 
+        self.world = self.load_world("overworld")
+
+    def load_world(self, name):
+        data = None
+        try:
+            with open(f"data/worlds/{name}.json", "r", encoding="utf-8") as file:
+                data = json.load(file)[name]
+        except FileNotFoundError:
+            print(f"File '{name}.json' does not exist.")
+            return
+        except json.JSONDecodeError:
+            print(f"File '{name}.json' is not a valid JSON.")
+            return
+
+        try:
+            world = World(**data)
+            return world
+        except TypeError:
+            print("World data is not formatted correctly.")
+            return None
+
     def get_chunk(self, x, y, z):
         chunk_key = (x, y, z)
         with self.chunk_lock:
             if chunk_key not in self.chunks:
-                chunk = Chunk(self.seed, (x, y, z), self, self.chunk_size, self.lower_limit, self.upper_limit)
+                chunk = Chunk(self.seed, (x, y, z), self.world, self.chunk_size, self.lower_limit, self.upper_limit)
                 self.chunks[chunk_key] = chunk
         return self.chunks.get(chunk_key)
 
@@ -28,12 +57,12 @@ class World:
         terrain_future = self.executor.submit(chunk.generate_terrain)
         terrain_future.result()  # Wait for terrain generation to complete
         yield terrain_future
-    
+
     def generate_chunk_mesh_async(self, chunk):
         mesh_future = self.executor.submit(chunk.generate_mesh)
         mesh_future.result()  # Wait for mesh generation to complete
         yield mesh_future
-    
+
     def load_chunks(self, current_chunk_position, render_distance):
         current_chunks = set()
         min_x, min_y, min_z = (current_chunk_position[i] - render_distance for i in range(3))
@@ -58,7 +87,7 @@ class World:
         for chunk_pos in chunks_to_unload:
             self.loaded_chunks.discard(chunk_pos)
             self.disable_chunk(chunk_pos)
-    
+
     def disable_chunk(self, chunk_pos):
         chunk = self.get_chunk(*chunk_pos)
         if chunk and chunk.entity:
@@ -86,7 +115,11 @@ class World:
             local_y = y % self.chunk_size
             local_z = z % self.chunk_size
             with chunk.lock:
-                chunk.blocks[local_x, local_y, local_z] = block_type
+                if block_type == "air":
+                    block = None
+                else:
+                    block = chunk._load_block(block_type)
+                chunk.blocks[local_x, local_y, local_z] = block
                 chunk.needs_update = True
 
             self._update_neighbor_chunks(chunk_x, chunk_y, chunk_z)

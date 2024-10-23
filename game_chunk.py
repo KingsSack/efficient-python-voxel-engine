@@ -1,10 +1,12 @@
+import json
+import random
 import threading
 
 import numpy as np
 from perlin_noise import PerlinNoise
 from ursina import Entity, Mesh, Vec3, scene
 
-from game_block import Block, Dirt, Grass, Stone
+from game_block import Block
 
 
 class Chunk:
@@ -28,6 +30,7 @@ class Chunk:
         with self.lock:
             self.blocks = np.empty((self.size, self.size, self.size), dtype=object)
             noise = PerlinNoise(octaves=4, seed=self.seed)
+            layers = self.world.layers
             for x in range(self.size):
                 for z in range(self.size):
                     world_x = x + self.position[0] * self.size
@@ -36,14 +39,25 @@ class Chunk:
                     for y in range(self.size):
                         world_y = self.position[1] * self.size + y
                         if self.lower_limit <= world_y < min(height, self.upper_limit):
-                            if world_y < 0:
-                                self.blocks[x, y, z] = Stone()
-                            elif world_y == height - 1:
-                                self.blocks[x, y, z] = Grass()
+                            random_percentage = random.random()
+                            if world_y == height - 1:
+                                for block, chance in self.world.surface.items():
+                                    if random_percentage < chance:
+                                        self.blocks[x, y, z] = self._load_block(block)
+                                        break
                             else:
-                                self.blocks[x, y, z] = Dirt()
+                                for layer_name, layer in layers.items():
+                                    next_layer_start = min(
+                                        (next_layer["start"] for next_layer_name, next_layer in layers.items() if next_layer["start"] > layer["start"]),
+                                        default=float('inf')
+                                    )
+                                    if layer["start"] <= world_y < next_layer_start:
+                                        for block, chance in layer["blocks"].items():
+                                            if random_percentage < chance:
+                                                self.blocks[x, y, z] = self._load_block(block)
+                                                break
                         else:
-                            self.blocks[x, y, z] = Block("air")
+                            self.blocks[x, y, z] = None
             self.needs_update = True
 
     def generate_mesh(self):
@@ -59,18 +73,20 @@ class Chunk:
                 for y in range(self.size):
                     for z in range(self.size):
                         block = self.blocks[x, y, z]
-                        if block.texture != "air":
-                            for face in range(6):
-                                if self.is_face_visible(x, y, z, face):
-                                    verts = self.get_face_vertices(x, y, z, face)
-                                    vertices.extend(verts)
-                                    tri = self.get_face_triangles(vertex_count)
-                                    triangles.extend(tri)
-                                    face_name = ['side', 'side', 'side', 'side', 'bottom', 'top'][face]
-                                    face_uv = block.get_face(face_name).uv
-                                    uvs.extend([(face_uv[0], face_uv[1]), (face_uv[2], face_uv[1]),
-                                                (face_uv[2], face_uv[3]), (face_uv[0], face_uv[3])])
-                                    vertex_count += 4
+                        if not block:
+                            continue
+
+                        for face in range(6):
+                            if self.is_face_visible(x, y, z, face):
+                                verts = self.get_face_vertices(x, y, z, face)
+                                vertices.extend(verts)
+                                tri = self.get_face_triangles(vertex_count)
+                                triangles.extend(tri)
+                                face_name = ['side', 'side', 'side', 'side', 'bottom', 'top'][face]
+                                face_uv = block.get_face(face_name)
+                                uvs.extend([(face_uv[0], face_uv[1]), (face_uv[2], face_uv[1]),
+                                            (face_uv[2], face_uv[3]), (face_uv[0], face_uv[3])])
+                                vertex_count += 4
 
             if not vertices:
                 if self.entity:
@@ -107,7 +123,7 @@ class Chunk:
         nx, ny, nz = x + dx, y + dy, z + dz
 
         if 0 <= nx < self.size and 0 <= ny < self.size and 0 <= nz < self.size:
-            return self.blocks[nx, ny, nz].texture == "air"  # If neighbor block is air, face is visible
+            return self.blocks[nx, ny, nz] == None  # If neighbor block is air, face is visible
         else:
             return True
 
@@ -136,9 +152,29 @@ class Chunk:
 
     def get_block(self, x, y, z):
         if self.blocks is None:
-            return Block("air")
+            return None
 
-        if 0 <= x < self.size and 0 <= y < self.size and 0 <= z < self.size:
-            return self.blocks[x, y, z]
-        else:
-            return Block("air")
+        # if 0 <= x < self.size and 0 <= y < self.size and 0 <= z < self.size:
+        #     return self.blocks[x, y, z]
+        # else:
+        #     return None
+
+        return self.blocks[x, y, z]
+
+    def _load_block(self, name):
+        data = None
+        try:
+            with open(f"data/blocks/{name}.json", "r", encoding="utf-8") as file:
+                data = json.load(file)[name]
+        except FileNotFoundError:
+            print(f"File '{name}.json' does not exist.")
+            return None
+        except json.JSONDecodeError:
+            print(f"File '{name}.json' is not a valid JSON.")
+            return None
+
+        try:
+            return Block(**data)
+        except TypeError:
+            print("Block data is not formatted correctly.")
+            return None
