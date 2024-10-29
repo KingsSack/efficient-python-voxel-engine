@@ -6,7 +6,7 @@ import numpy as np
 from perlin_noise import PerlinNoise
 from ursina import Entity, Mesh, Vec3, scene
 
-from game_block import Block
+from src.game_block import Block
 
 
 class Chunk:
@@ -21,7 +21,20 @@ class Chunk:
         self.entity = None
         self.blocks = None
         self.needs_update = True
+
         self.lock = threading.Lock()
+
+        self.noise_cache = {}
+        self.block_cache = {}
+
+        self.face_indices = [
+            [0, 1, 2, 3],  # front
+            [5, 4, 7, 6],  # back
+            [4, 0, 3, 7],  # left
+            [1, 5, 6, 2],  # right
+            [4, 5, 1, 0],  # bottom
+            [3, 2, 6, 7]   # top
+        ]
 
     def generate_terrain(self):
         if self.blocks is not None:
@@ -41,10 +54,9 @@ class Chunk:
                         if self.lower_limit <= world_y < min(height, self.upper_limit):
                             random_percentage = random.random()
                             if world_y == height - 1:
-                                for block, chance in self.world.surface.items():
-                                    if random_percentage < chance:
-                                        self.blocks[x, y, z] = self._load_block(block)
-                                        break
+                                block = next((block for block, chance in self.world.surface.items() if random_percentage < chance), None)
+                                if block:
+                                    self.blocks[x, y, z] = self._load_block(block)
                             else:
                                 for layer_name, layer in layers.items():
                                     next_layer_start = min(
@@ -52,10 +64,10 @@ class Chunk:
                                         default=float('inf')
                                     )
                                     if layer["start"] <= world_y < next_layer_start:
-                                        for block, chance in layer["blocks"].items():
-                                            if random_percentage < chance:
-                                                self.blocks[x, y, z] = self._load_block(block)
-                                                break
+                                        block = next((block for block, chance in layer["blocks"].items() if random_percentage < chance), None)
+                                        if block:
+                                            self.blocks[x, y, z] = self._load_block(block)
+                                            break
                         else:
                             self.blocks[x, y, z] = None
             self.needs_update = True
@@ -65,8 +77,8 @@ class Chunk:
             return
 
         with self.lock:
-            vertices = []
-            triangles = []
+            vertices = np.array([], dtype=np.float32)
+            triangles = np.array([], dtype=np.int32)
             uvs = []
             vertex_count = 0
             for x in range(self.size):
@@ -106,6 +118,7 @@ class Chunk:
                 )
             else:
                 self.entity.model = self.mesh
+                self.entity.collider = 'mesh'
                 self.entity.enable()
 
             self.needs_update = False
@@ -123,9 +136,8 @@ class Chunk:
         nx, ny, nz = x + dx, y + dy, z + dz
 
         if 0 <= nx < self.size and 0 <= ny < self.size and 0 <= nz < self.size:
-            return self.blocks[nx, ny, nz] == None  # If neighbor block is air, face is visible
-        else:
-            return True
+            return not self.blocks[nx, ny, nz] # Check if None directly
+        return True
 
     @staticmethod
     def get_face_vertices(x, y, z, face):
@@ -153,15 +165,12 @@ class Chunk:
     def get_block(self, x, y, z):
         if self.blocks is None:
             return None
-
-        # if 0 <= x < self.size and 0 <= y < self.size and 0 <= z < self.size:
-        #     return self.blocks[x, y, z]
-        # else:
-        #     return None
-
         return self.blocks[x, y, z]
 
     def _load_block(self, name):
+        if name in self.block_cache:
+            return self.block_cache[name]
+
         data = None
         try:
             with open(f"data/blocks/{name}.json", "r", encoding="utf-8") as file:
@@ -174,7 +183,9 @@ class Chunk:
             return None
 
         try:
-            return Block(**data)
+            block = Block(**data)
+            self.block_cache[name] = block
+            return block
         except TypeError:
             print("Block data is not formatted correctly.")
             return None
